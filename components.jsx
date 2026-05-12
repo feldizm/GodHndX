@@ -394,7 +394,193 @@ const MapPanel = ({ services, activeId, onPin }) => {
   );
 };
 
+// External finder cards. Deep-link to the authoritative directories with the
+// user's postcode prefilled where the target site supports it. Filters by
+// category so only the relevant cards show.
+const FinderGrid = ({ postcode, category, title = "Search a specialist directory", subtitle, limit }) => {
+  const finders = window.APP_DATA.finders || [];
+  const filtered = finders.filter(f => {
+    if (!category || category === "all") return true;
+    return (f.categories || []).includes(category);
+  });
+  const items = limit ? filtered.slice(0, limit) : filtered;
+  if (items.length === 0) return null;
+
+  const resolveUrl = (finder) => {
+    if (postcode && finder.urlWithPostcode) {
+      return finder.urlWithPostcode.replace("{postcode}", encodeURIComponent(postcode));
+    }
+    return finder.url;
+  };
+
+  return (
+    <section className="section">
+      <div className="section-title">
+        <h2>{title}</h2>
+        {subtitle && <span className="hint">{subtitle}</span>}
+      </div>
+      <div className="finder-grid">
+        {items.map(f => (
+          <a
+            key={f.id}
+            className="finder-card"
+            href={resolveUrl(f)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <div className="finder-head">
+              <span className="finder-scope">{f.scope}</span>
+              <span className="finder-reach">{f.reach}</span>
+            </div>
+            <h3>{f.name}</h3>
+            <p>{f.blurb}</p>
+            <span className="finder-go">
+              {postcode && f.urlWithPostcode
+                ? <>Open with <span style={{ fontFamily: "var(--font-mono)" }}>{postcode}</span> <Icon name="arrow-ne" size={14} /></>
+                : <>Open directory <Icon name="arrow-ne" size={14} /></>}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+// Maps app category ids to ALISS API category slugs (best-effort; ALISS uses
+// loosely structured tag categories so unmatched ids skip the filter).
+const ALISS_CATEGORY = {
+  "mental-health": "mental-health",
+  "addiction": "drugs-and-alcohol",
+  "bereavement": "bereavement",
+  "peer": "peer-support",
+  "young": "young-people",
+  "lgbtq": "lgbt",
+  "advocacy": "advocacy",
+  "spiritual": "spiritual",
+};
+
+// AlissPanel — live fetch from aliss.org with graceful fallback. If the API
+// is unreachable or the response shape is unexpected, we degrade silently to
+// a deep-link CTA so the user can finish the journey on ALISS itself.
+const AlissPanel = ({ postcode, category }) => {
+  const [state, setState] = useState({ status: "idle", items: [] });
+  const origin = useMemo(() => lookupPostcode(postcode), [postcode]);
+
+  useEffect(() => {
+    if (!postcode) { setState({ status: "idle", items: [] }); return; }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    setState({ status: "loading", items: [] });
+
+    const params = new URLSearchParams();
+    params.set("postcode", postcode);
+    params.set("page_size", "20");
+    if (category && category !== "all" && ALISS_CATEGORY[category]) {
+      params.set("category", ALISS_CATEGORY[category]);
+    }
+    const url = `https://www.aliss.org/api/v4/services/?${params.toString()}`;
+
+    fetch(url, { signal: controller.signal, headers: { "Accept": "application/json" } })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(data => {
+        const raw = data.data || data.results || data.items || [];
+        const items = raw.map(s => {
+          const loc = (s.locations && s.locations[0]) || {};
+          const lat = loc.latitude ?? loc.lat ?? null;
+          const lng = loc.longitude ?? loc.lng ?? null;
+          const distance = origin && lat && lng ? milesBetween(origin, { lat, lng }) : null;
+          return {
+            id: s.id || s.slug || s.name,
+            name: s.name,
+            description: s.description || s.summary || "",
+            phone: s.phone || (s.contacts && s.contacts.phone) || null,
+            url: s.url || s.website || null,
+            address: loc.formatted_address || loc.address || null,
+            postcode: loc.postal_code || loc.postcode || null,
+            distance,
+          };
+        }).filter(x => x.name);
+        items.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+        setState({ status: items.length ? "ok" : "empty", items });
+      })
+      .catch(() => setState({ status: "error", items: [] }))
+      .finally(() => clearTimeout(timer));
+
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [postcode, category, origin]);
+
+  if (!postcode) return null;
+
+  const alissDeepLink = `https://www.aliss.org/?postcode=${encodeURIComponent(postcode)}`;
+
+  return (
+    <section className="section aliss-section" aria-live="polite">
+      <div className="section-title">
+        <h2>Live community results · ALISS</h2>
+        <a className="hint" href={alissDeepLink} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-2)" }}>
+          Open all on aliss.org <Icon name="arrow-ne" size={12} />
+        </a>
+      </div>
+
+      {state.status === "loading" && (
+        <div className="aliss-status">Searching ALISS for services near {postcode}…</div>
+      )}
+
+      {state.status === "error" && (
+        <div className="aliss-status">
+          <p>Couldn&rsquo;t reach ALISS right now. The 1,000+ community services on aliss.org are still searchable directly.</p>
+          <a className="btn btn-secondary" href={alissDeepLink} target="_blank" rel="noopener noreferrer">
+            Open ALISS for {postcode} <Icon name="arrow-ne" size={14} />
+          </a>
+        </div>
+      )}
+
+      {state.status === "empty" && (
+        <div className="aliss-status">
+          <p>No ALISS matches for that postcode and filter. Try the full ALISS directory:</p>
+          <a className="btn btn-secondary" href={alissDeepLink} target="_blank" rel="noopener noreferrer">
+            Open ALISS for {postcode} <Icon name="arrow-ne" size={14} />
+          </a>
+        </div>
+      )}
+
+      {state.status === "ok" && (
+        <div className="aliss-list">
+          {state.items.map(s => (
+            <article className="aliss-card" key={s.id}>
+              <div className="aliss-head">
+                <h3>{s.name}</h3>
+                {s.distance != null && (
+                  <span className="distance-pill">{formatMiles(s.distance)}</span>
+                )}
+              </div>
+              {s.address && <p className="muted" style={{ margin: "4px 0", fontSize: 13 }}>{s.address}</p>}
+              {s.description && <p className="blurb">{s.description.length > 240 ? s.description.slice(0, 240) + "…" : s.description}</p>}
+              <div className="aliss-actions">
+                {s.phone && (
+                  <a className="btn btn-safe" href={`tel:${(s.phone || "").replace(/\s/g, "")}`}>
+                    <Icon name="phone" size={14} /> Call
+                  </a>
+                )}
+                {s.url && (
+                  <a className="btn btn-secondary" href={s.url} target="_blank" rel="noopener noreferrer">
+                    Open service <Icon name="arrow-ne" size={12} />
+                  </a>
+                )}
+              </div>
+            </article>
+          ))}
+          <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+            Data from <a href={alissDeepLink} target="_blank" rel="noopener noreferrer">aliss.org</a> — community-curated, refreshed daily.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+};
+
 Object.assign(window, {
   Icon, CATEGORY_ICON, Header, Footer, CrisisStrip, MobileCrisisBar,
   ServiceCard, MapPanel, externalUrl, lookupPostcode, milesBetween, formatMiles,
+  FinderGrid, AlissPanel,
 });

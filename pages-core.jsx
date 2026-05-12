@@ -177,6 +177,12 @@ const LandingPage = ({ go }) => {
         </div>
       </section>
 
+      {/* External specialist finders */}
+      <FinderGrid
+        title="Or jump straight into a specialist directory"
+        subtitle={`${window.APP_DATA.finders.length} live national directories`}
+      />
+
       {/* Plain English callout */}
       <section className="section">
         <div className="callout">
@@ -429,6 +435,21 @@ const ResultsPage = ({ go, params }) => {
           <MapPanel services={sorted} activeId={activePin} onPin={setActivePin} />
         )}
       </div>
+
+      {/* Live results from ALISS — only when we have a postcode to search */}
+      {postcode && view !== "map" && (
+        <AlissPanel postcode={postcode} category={category} />
+      )}
+
+      {/* Specialist finders relevant to the current category */}
+      {view !== "map" && (
+        <FinderGrid
+          postcode={postcode}
+          category={category}
+          title={category === "all" ? "Search a specialist directory" : "Find more in this category"}
+          subtitle="Live, postcode-aware directories run by the experts"
+        />
+      )}
     </div>
   );
 };

@@ -850,3 +850,82 @@ ol.steps li::before {
   padding: 24px; background: var(--surface);
 }
 .empty-card h3 { margin-bottom: 8px; }
+
+/* External finder grid ================================ */
+.finder-grid {
+  display: grid; gap: 0;
+  grid-template-columns: 1fr;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 700px) { .finder-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1100px) { .finder-grid { grid-template-columns: repeat(3, 1fr); } }
+.finder-card {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 24px 24px 22px;
+  text-decoration: none;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  position: relative;
+  min-height: 200px;
+  transition: background .15s ease;
+}
+@media (min-width: 700px) { .finder-card:nth-child(2n) { border-right: 0; } }
+@media (min-width: 1100px) {
+  .finder-card:nth-child(2n) { border-right: 1px solid var(--line); }
+  .finder-card:nth-child(3n) { border-right: 0; }
+}
+.finder-card:hover { background: var(--surface); }
+.finder-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600;
+  color: var(--ink-mute);
+  font-family: var(--font-body);
+}
+.finder-scope::before {
+  content: ""; display: inline-block; width: 8px; height: 8px;
+  background: var(--accent-2); border-radius: 50%; margin-right: 8px;
+  vertical-align: middle;
+}
+.finder-reach { color: var(--accent); }
+.finder-card h3 { font-size: calc(19px * var(--fs-step)); letter-spacing: -0.015em; }
+.finder-card p { font-size: 14px; color: var(--ink-soft); margin: 0; line-height: 1.45; }
+.finder-card .finder-go {
+  margin-top: auto;
+  font-size: 13px; font-weight: 500;
+  color: var(--accent-2);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding-top: 8px;
+}
+.finder-card:hover .finder-go { gap: 8px; }
+
+/* ALISS live panel ===================================== */
+.aliss-section { margin-top: clamp(32px, 5vw, 56px); }
+.aliss-status {
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  display: flex; flex-direction: column; gap: 12px;
+  align-items: flex-start;
+}
+.aliss-list {
+  display: grid; gap: 0;
+  grid-template-columns: 1fr;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 720px) { .aliss-list { grid-template-columns: 1fr 1fr; } }
+.aliss-card {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 10px;
+}
+@media (min-width: 720px) {
+  .aliss-card:nth-child(2n) { border-left: 1px solid var(--line); padding-left: 24px; margin-left: 24px; }
+}
+.aliss-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.aliss-card h3 { font-size: calc(18px * var(--fs-step)); letter-spacing: -0.015em; }
+.aliss-card .blurb { font-size: 14px; color: var(--ink-soft); margin: 0; }
+.aliss-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.aliss-actions .btn { min-height: 40px; padding: 0 14px; font-size: 13px; }
