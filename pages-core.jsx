@@ -287,6 +287,30 @@ const ResultsPage = ({ go, params }) => {
     setCategory("all"); setHealthBoard("all"); setRadius(DEFAULT_RADIUS_MILES);
   };
 
+  // Active-filter count drives the collapsible summary label. Category +
+  // health-board switches count too so users see "what's hiding" without
+  // expanding the panel.
+  const activeFilterCount =
+    (openNowOnly ? 1 : 0)
+    + Object.values(filters).filter(Boolean).length
+    + (category !== "all" ? 1 : 0)
+    + (healthBoard !== "all" ? 1 : 0)
+    + (origin && radius !== DEFAULT_RADIUS_MILES ? 1 : 0);
+
+  // Default expanded on >=900px (desktop, where there's a sidebar slot),
+  // collapsed on mobile so the panel doesn't dominate the screen.
+  const initialFiltersOpen = typeof window !== "undefined"
+    && window.matchMedia
+    && window.matchMedia("(min-width: 900px)").matches;
+  const [filtersOpen, setFiltersOpen] = useState(initialFiltersOpen);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(min-width: 900px)");
+    const handle = (e) => setFiltersOpen(e.matches);
+    mq.addEventListener ? mq.addEventListener("change", handle) : mq.addListener(handle);
+    return () => mq.removeEventListener ? mq.removeEventListener("change", handle) : mq.removeListener(handle);
+  }, []);
+
   return (
     <div className="page">
       <a className="crumb" href="#" onClick={(e) => { e.preventDefault(); go("home"); }}>
@@ -335,63 +359,74 @@ const ResultsPage = ({ go, params }) => {
 
       <div className={`results-layout ${view === "split" ? "with-map" : ""}`}>
         <aside className="filter-panel" aria-label="Filters">
-          {origin && (
-            <>
-              <h3>Distance</h3>
-              <div className="filter-group">
-                <div className="radius-row">
-                  <input
-                    type="range"
-                    min={1} max={50} step={1}
-                    value={radius}
-                    onChange={(e) => setRadius(Number(e.target.value))}
-                    aria-label="Search radius in miles"
-                  />
-                  <span className="val">{radius} mi</span>
+          <details
+            className="filter-collapsible"
+            open={filtersOpen}
+            onToggle={(e) => setFiltersOpen(e.currentTarget.open)}
+          >
+            <summary>
+              <span>Filters</span>
+              {activeFilterCount > 0 && <span className="count">{activeFilterCount} active</span>}
+            </summary>
+
+            {origin && (
+              <>
+                <h3>Distance</h3>
+                <div className="filter-group">
+                  <div className="radius-row">
+                    <input
+                      type="range"
+                      min={1} max={50} step={1}
+                      value={radius}
+                      onChange={(e) => setRadius(Number(e.target.value))}
+                      aria-label="Search radius in miles"
+                    />
+                    <span className="val">{radius} mi</span>
+                  </div>
+                  <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+                    Crisis lines &amp; national services are always shown.
+                  </p>
                 </div>
-                <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
-                  Crisis lines &amp; national services are always shown.
-                </p>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          <h3>Quick filters</h3>
-          <div className="filter-group">
-            <label><input type="checkbox" checked={openNowOnly} onChange={(e) => setOpenNowOnly(e.target.checked)} /> Open right now</label>
-            <label><input type="checkbox" checked={filters.wheelchair} onChange={(e) => setFilters({ ...filters, wheelchair: e.target.checked })} /> Wheelchair accessible</label>
-            <label><input type="checkbox" checked={filters.online} onChange={(e) => setFilters({ ...filters, online: e.target.checked })} /> Online or phone option</label>
-            <label><input type="checkbox" checked={filters.selfRef} onChange={(e) => setFilters({ ...filters, selfRef: e.target.checked })} /> Self-referral (no GP needed)</label>
-            <label><input type="checkbox" checked={filters.under18} onChange={(e) => setFilters({ ...filters, under18: e.target.checked })} /> Under 18 friendly</label>
-            <label><input type="checkbox" checked={filters.lgbtq} onChange={(e) => setFilters({ ...filters, lgbtq: e.target.checked })} /> LGBTQ+ affirming</label>
-          </div>
+            <h3>Quick filters</h3>
+            <div className="filter-group">
+              <label><input type="checkbox" checked={openNowOnly} onChange={(e) => setOpenNowOnly(e.target.checked)} /> Open right now</label>
+              <label><input type="checkbox" checked={filters.wheelchair} onChange={(e) => setFilters({ ...filters, wheelchair: e.target.checked })} /> Wheelchair accessible</label>
+              <label><input type="checkbox" checked={filters.online} onChange={(e) => setFilters({ ...filters, online: e.target.checked })} /> Online or phone option</label>
+              <label><input type="checkbox" checked={filters.selfRef} onChange={(e) => setFilters({ ...filters, selfRef: e.target.checked })} /> Self-referral (no GP needed)</label>
+              <label><input type="checkbox" checked={filters.under18} onChange={(e) => setFilters({ ...filters, under18: e.target.checked })} /> Under 18 friendly</label>
+              <label><input type="checkbox" checked={filters.lgbtq} onChange={(e) => setFilters({ ...filters, lgbtq: e.target.checked })} /> LGBTQ+ affirming</label>
+            </div>
 
-          <h3>Service type</h3>
-          <div className="filter-group">
-            {window.APP_DATA.categories.map(c => (
-              <label key={c.id}>
-                <input type="radio" name="cat" checked={category === c.id} onChange={() => setCategory(c.id)} />
-                {c.name}
-              </label>
-            ))}
-            <label><input type="radio" name="cat" checked={category === "all"} onChange={() => setCategory("all")} /> Show all</label>
-          </div>
-
-          <h3>NHS board</h3>
-          <div className="filter-group">
-            <select
-              value={healthBoard}
-              onChange={(e) => setHealthBoard(e.target.value)}
-              aria-label="Filter by NHS board"
-            >
-              <option value="all">All boards</option>
-              {window.APP_DATA.healthBoards.map(b => (
-                <option key={b.id} value={b.id}>{b.name}</option>
+            <h3>Service type</h3>
+            <div className="filter-group">
+              {window.APP_DATA.categories.map(c => (
+                <label key={c.id}>
+                  <input type="radio" name="cat" checked={category === c.id} onChange={() => setCategory(c.id)} />
+                  {c.name}
+                </label>
               ))}
-            </select>
-          </div>
+              <label><input type="radio" name="cat" checked={category === "all"} onChange={() => setCategory("all")} /> Show all</label>
+            </div>
 
-          <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={clearAll}>Clear all</button>
+            <h3>NHS board</h3>
+            <div className="filter-group">
+              <select
+                value={healthBoard}
+                onChange={(e) => setHealthBoard(e.target.value)}
+                aria-label="Filter by NHS board"
+              >
+                <option value="all">All boards</option>
+                {window.APP_DATA.healthBoards.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={clearAll}>Clear all</button>
+          </details>
         </aside>
 
         {view !== "map" && (
