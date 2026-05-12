@@ -107,8 +107,8 @@ const Footer = ({ go }) => (
     <div className="row">
       <div>
         <h4>About this library</h4>
-        <p>A free, public directory of mental health and addiction services across Scotland. Information current as of May 2026.</p>
-        <p className="muted" style={{ fontSize: 13 }}>Sources: gov.scot, NHS boards, 30 Alcohol & Drug Partnerships, ALISS, SAMH, Penumbra, Cruse, LGBT Health & Wellbeing.</p>
+        <p>A free, public directory of mental health and addiction services across Scotland. {window.APP_DATA?.services?.length || 0}+ services indexed across 14 NHS boards and 30 Alcohol & Drug Partnerships. Current as of May 2026.</p>
+        <p className="muted" style={{ fontSize: 13 }}>Sources: gov.scot (residential rehab capacity, Oct 2025), all 14 NHS boards, 30 ADPs, Scottish Drug Services Directory, ALISS, SAMH, Penumbra, Cruse, LGBT Health & Wellbeing, Pink Therapy, AA/NA/CA intergroups, NHS chaplaincy networks.</p>
       </div>
       <div>
         <h4>Help us improve</h4>
@@ -169,16 +169,34 @@ const ServiceCard = ({ service, onOpen }) => (
   </article>
 );
 
-// Tiny SVG-based "map" — abstract Edinburgh placeholder with pins for services
+// Tiny SVG-based "map" — pins for any services with lat/lng. Auto-bounds
+// to whatever's passed in (with margin) so non-Edinburgh searches still
+// show pins. Falls back to a Scotland-wide extent if 0–1 services have coords.
+const SCOT_BOUNDS = { minLat: 54.6, maxLat: 60.9, minLng: -7.7, maxLng: -0.7 };
 const MapPanel = ({ services, activeId, onPin }) => {
-  // Project lat/lng into the box (approximate Edinburgh extent)
-  const bounds = { minLat: 55.91, maxLat: 55.98, minLng: -3.26, maxLng: -3.13 };
+  const geo = services.filter(s => s.lat && s.lng);
+  let bounds;
+  if (geo.length >= 2) {
+    const lats = geo.map(s => s.lat), lngs = geo.map(s => s.lng);
+    const padLat = Math.max(0.02, (Math.max(...lats) - Math.min(...lats)) * 0.15);
+    const padLng = Math.max(0.03, (Math.max(...lngs) - Math.min(...lngs)) * 0.15);
+    bounds = {
+      minLat: Math.min(...lats) - padLat, maxLat: Math.max(...lats) + padLat,
+      minLng: Math.min(...lngs) - padLng, maxLng: Math.max(...lngs) + padLng,
+    };
+  } else if (geo.length === 1) {
+    const s = geo[0];
+    bounds = { minLat: s.lat - 0.05, maxLat: s.lat + 0.05, minLng: s.lng - 0.08, maxLng: s.lng + 0.08 };
+  } else {
+    bounds = SCOT_BOUNDS;
+  }
   const pinFor = (s) => {
     if (!s.lat || !s.lng) return null;
     const x = ((s.lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100;
     const y = ((bounds.maxLat - s.lat) / (bounds.maxLat - bounds.minLat)) * 100;
     return { x, y };
   };
+  const offScreen = services.length - geo.length;
   return (
     <aside className="map-panel" aria-label="Map of services">
       <div className="map-canvas">
@@ -201,7 +219,10 @@ const MapPanel = ({ services, activeId, onPin }) => {
           );
         })}
       </div>
-      <div className="map-attribution">Edinburgh & Lothians · approximate locations · tap a pin for details</div>
+      <div className="map-attribution">
+        Approximate locations · tap a pin for details
+        {offScreen > 0 && ` · ${offScreen} phone/online service${offScreen > 1 ? "s" : ""} not shown`}
+      </div>
     </aside>
   );
 };

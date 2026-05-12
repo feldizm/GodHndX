@@ -9,6 +9,13 @@ const decisionPaths = [
     routeTo: { type: "results", params: { category: "crisis" } },
   },
   {
+    id: "self-harm",
+    title: "I'm self-harming or thinking about it",
+    blurb: "Webchat, helplines and harm-reduction support. From age 12.",
+    urgency: "high",
+    routeTo: { type: "detail", params: { id: "selfharm-network" } },
+  },
+  {
     id: "addiction",
     title: "I'm struggling with drugs or alcohol",
     blurb: "Treatment, harm reduction, residential rehab, help to cut down or stop.",
@@ -21,6 +28,20 @@ const decisionPaths = [
     blurb: "Talking therapy, counselling, mental health teams.",
     urgency: "med",
     routeTo: { type: "results", params: { category: "mental-health" } },
+  },
+  {
+    id: "trauma",
+    title: "I'm dealing with trauma or PTSD",
+    blurb: "Trauma-informed therapy, EMDR, trauma-focused CBT.",
+    urgency: "med",
+    routeTo: { type: "detail", params: { id: "rivers-centre" } },
+  },
+  {
+    id: "eating",
+    title: "I have a problem with food or eating",
+    blurb: "Eating disorder helplines, peer groups and NHS specialist services.",
+    urgency: "med",
+    routeTo: { type: "detail", params: { id: "beat-eat" } },
   },
   {
     id: "young",
@@ -51,11 +72,18 @@ const decisionPaths = [
     routeTo: { type: "results", params: { category: "peer" } },
   },
   {
-    id: "someone-else",
-    title: "I'm worried about someone else",
-    blurb: "Support for family, carers, friends.",
+    id: "advocacy",
+    title: "I need someone on my side",
+    blurb: "Independent advocacy, victim support, domestic abuse and rape crisis.",
+    urgency: "med",
+    routeTo: { type: "results", params: { category: "advocacy" } },
+  },
+  {
+    id: "carer",
+    title: "I'm caring for someone with mental health or addiction problems",
+    blurb: "Emotional support, respite, peer groups and family-specific helplines.",
     urgency: "low",
-    routeTo: { type: "results", params: { category: "mental-health" } },
+    routeTo: { type: "detail", params: { id: "carers-trust" } },
   },
 ];
 

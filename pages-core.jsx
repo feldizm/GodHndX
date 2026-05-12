@@ -89,6 +89,56 @@ const LandingPage = ({ go, variant }) => {
 
       <section className="section">
         <div className="section-title">
+          <h2>Browse by NHS board</h2>
+          <span className="hint">{window.APP_DATA.healthBoards.filter(b => b.id !== "national").length} territorial boards</span>
+        </div>
+        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+          {window.APP_DATA.healthBoards.filter(b => b.id !== "national").map(b => (
+            <a
+              key={b.id}
+              href="#"
+              onClick={(e) => { e.preventDefault(); go("results", { healthBoard: b.id }); }}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "12px 16px", borderRadius: 10,
+                background: "var(--surface)", border: "1px solid var(--line)",
+                color: "var(--ink)", textDecoration: "none", fontSize: 14,
+              }}
+            >
+              <span>{b.name}</span>
+              <Icon name="right" size={14} />
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-title">
+          <h2>Drugs &amp; alcohol — finding your ADP</h2>
+          <span className="hint">{window.APP_DATA.adps.length} partnerships</span>
+        </div>
+        <div className="fact-card" style={{ maxWidth: 920 }}>
+          <p>Each council area has an <strong>Alcohol &amp; Drug Partnership (ADP)</strong> that commissions local treatment, harm reduction and the route into residential rehab. Funding for placements is currently covered by the Scottish Government&rsquo;s Rapid Capacity Fund.</p>
+          <details style={{ marginTop: 8 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Show all 30 ADPs</summary>
+            <ul style={{ columns: 2, columnGap: 24, marginTop: 12, paddingLeft: 18, fontSize: 14 }}>
+              {window.APP_DATA.adps.map(a => (
+                <li key={a.name} style={{ breakInside: "avoid", marginBottom: 4 }}>
+                  <strong>{a.name}</strong>{" "}
+                  <span className="muted" style={{ fontSize: 12 }}>· {a.healthBoard}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <button className="btn btn-secondary" onClick={() => go("results", { category: "addiction" })}>See addiction services</button>
+            <a className="btn btn-ghost" href="https://scottishdrugservices.com" target="_blank" rel="noopener">Scottish Drug Services Directory</a>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="section-title">
           <h2>Plain English. No jargon.</h2>
         </div>
         <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: 24, display: "grid", gap: 16, gridTemplateColumns: "1fr", maxWidth: 760 }}>
@@ -117,14 +167,17 @@ const ResultsPage = ({ go, params }) => {
     wheelchair: false, online: false, selfRef: false, lgbtq: false, under18: false,
   });
   const [category, setCategory] = useState(initialCategory);
+  const [healthBoard, setHealthBoard] = useState(params.healthBoard || "all");
   const [view, setView] = useState("list"); // list | split | map
   const [activePin, setActivePin] = useState(null);
 
   useEffect(() => { setCategory(initialCategory); }, [initialCategory]);
+  useEffect(() => { setHealthBoard(params.healthBoard || "all"); }, [params.healthBoard]);
 
   const filtered = useMemo(() => {
     return allServices.filter(s => {
       if (category !== "all" && s.category !== category) return false;
+      if (healthBoard !== "all" && s.healthBoard !== healthBoard && s.healthBoard !== "national") return false;
       if (openNowOnly && !s.openNow) return false;
       if (filters.wheelchair && !s.access.includes("wheelchair")) return false;
       if (filters.online && !s.access.includes("online-option")) return false;
@@ -133,7 +186,11 @@ const ResultsPage = ({ go, params }) => {
       if (filters.under18 && !(s.ageRange.includes("5") || s.ageRange.includes("16") || s.ageRange.includes("under"))) return false;
       return true;
     });
-  }, [allServices, category, openNowOnly, filters]);
+  }, [allServices, category, healthBoard, openNowOnly, filters]);
+
+  const boardLabel = healthBoard === "all"
+    ? null
+    : (window.APP_DATA.healthBoards.find(b => b.id === healthBoard)?.name || null);
 
   // group by urgency
   const crisis = filtered.filter(s => s.category === "crisis");
@@ -152,8 +209,11 @@ const ResultsPage = ({ go, params }) => {
             Help near <span style={{ fontFamily: "var(--font-mono)" }}>{postcode}</span>
           </h1>
           <p className="muted" style={{ marginTop: 4 }}>
-            Edinburgh · EH postcodes ·{" "}
+            {boardLabel ? <>{boardLabel} · </> : <>Postcode {postcode} · </>}
             <a href="#" onClick={(e) => { e.preventDefault(); go("home"); }} style={{ color: "var(--ink)" }}>Change postcode</a>
+            {boardLabel && (
+              <> · <a href="#" onClick={(e) => { e.preventDefault(); setHealthBoard("all"); }} style={{ color: "var(--ink)" }}>All boards</a></>
+            )}
           </p>
         </div>
         <div className="list-map-toggle" role="tablist" aria-label="View">
@@ -204,7 +264,26 @@ const ResultsPage = ({ go, params }) => {
             ))}
             <label><input type="radio" name="cat" checked={category === "all"} onChange={() => setCategory("all")} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} /> Show all</label>
           </div>
-          <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => { setOpenNowOnly(false); setFilters({ wheelchair: false, online: false, selfRef: false, lgbtq: false, under18: false }); setCategory("all"); }}>Clear all</button>
+          <h3>NHS board</h3>
+          <div className="filter-group">
+            <select
+              value={healthBoard}
+              onChange={(e) => setHealthBoard(e.target.value)}
+              aria-label="Filter by NHS board"
+              style={{
+                width: "100%", height: 44, padding: "0 12px",
+                borderRadius: 10, border: "1.5px solid var(--line-strong)",
+                background: "var(--bg)", color: "var(--ink)",
+                font: "inherit", fontSize: 14,
+              }}
+            >
+              <option value="all">All boards</option>
+              {window.APP_DATA.healthBoards.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => { setOpenNowOnly(false); setFilters({ wheelchair: false, online: false, selfRef: false, lgbtq: false, under18: false }); setCategory("all"); setHealthBoard("all"); }}>Clear all</button>
         </aside>
 
         {view !== "map" && (
