@@ -1,6 +1,17 @@
 // Shared components for the prototype
 const { useState, useEffect, useMemo, useRef } = React;
 
+// Normalize a service website value into a navigable URL.
+// Data uses bare hostnames (e.g. "samh.org.uk") but a few entries may
+// already include a scheme or path — prefix only when missing.
+const externalUrl = (value) => {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^\/\//.test(trimmed)) return `https:${trimmed}`;
+  return `https://${trimmed.replace(/^\/+/, "")}`;
+};
+
 // Inline icon component — small set, no external lib
 const Icon = ({ name, size = 18 }) => {
   const s = size;

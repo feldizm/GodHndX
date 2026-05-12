@@ -132,7 +132,7 @@ const LandingPage = ({ go, variant }) => {
           </details>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
             <button className="btn btn-secondary" onClick={() => go("results", { category: "addiction" })}>See addiction services</button>
-            <a className="btn btn-ghost" href="https://scottishdrugservices.com" target="_blank" rel="noopener">Scottish Drug Services Directory</a>
+            <a className="btn btn-ghost" href="https://scottishdrugservices.com" target="_blank" rel="noopener noreferrer">Scottish Drug Services Directory</a>
           </div>
         </div>
       </section>
@@ -476,7 +476,7 @@ const DetailPage = ({ go, params }) => {
             {service.website && (
               <div className="fact-row">
                 <span className="label">Website</span>
-                <div className="val"><a href={`https://${service.website}`} target="_blank" rel="noopener">{service.website}</a></div>
+                <div className="val"><a href={externalUrl(service.website)} target="_blank" rel="noopener noreferrer">{service.website}</a></div>
               </div>
             )}
             {service.address && (
