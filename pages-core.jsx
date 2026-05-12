@@ -1,109 +1,146 @@
 // Landing, Results, Detail pages
 
-const LandingPage = ({ go, variant }) => {
+const DEFAULT_RADIUS_MILES = 15;
+const POSTCODE_RE = /^[A-Z]{1,2}[0-9R][0-9A-Z]?\s*[0-9]?[A-Z]{0,2}$/i;
+
+const LandingPage = ({ go }) => {
   const [postcode, setPostcode] = useState("");
+  const [error, setError] = useState("");
   const submit = (e) => {
     e?.preventDefault();
-    go("results", { postcode: postcode || "EH8 8DX" });
+    const value = postcode.trim().toUpperCase();
+    if (!value) { setError("Enter a Scottish postcode — e.g. EH8 8DX"); return; }
+    if (!POSTCODE_RE.test(value)) { setError("That doesn’t look like a UK postcode."); return; }
+    if (!lookupPostcode(value)) { setError("Only Scottish postcodes are supported in this directory."); return; }
+    go("results", { postcode: value });
   };
   const emergency = window.APP_DATA.emergency;
   const categories = window.APP_DATA.categories;
+  const boards = window.APP_DATA.healthBoards.filter(b => b.id !== "national");
+  const allServiceCount = window.APP_DATA.services.length;
 
   return (
     <div className="page">
-      <section className="section" style={{ marginTop: 8 }}>
-        <p className="eyebrow">Free · Confidential · No referral needed</p>
-        <h1 style={{ marginBottom: 16, maxWidth: 720 }}>
-          Find mental health and addiction support near you.
-        </h1>
-        <p style={{ fontSize: "calc(19px * var(--fs-step))", color: "var(--ink-soft)", maxWidth: 620, marginBottom: 28 }}>
-          Search by postcode for crisis lines, NHS services, addiction services, and peer support across Scotland. You don&rsquo;t need to know what you&rsquo;re looking for — start with where you are.
-        </p>
+      {/* Editorial hero */}
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Free · Confidential · No referral needed</p>
+          <h1 className="hero-title">
+            Help with your<br />mental health, <em>nearby.</em>
+          </h1>
+          <p className="hero-sub">
+            Search by postcode for crisis lines, NHS services, addiction support and peer meetings across Scotland. You don&rsquo;t need to know what you&rsquo;re looking for — start where you are.
+          </p>
+        </div>
+        <div className="hero-aside">
+          <div className="hero-stat">
+            <strong>{allServiceCount}+</strong>
+            services across all 32 council areas, verified quarterly.
+          </div>
+          <div className="hero-stat">
+            <strong>24/7</strong>
+            crisis numbers always one tap away — including offline.
+          </div>
+          <div className="hero-stat">
+            <strong>15 mi</strong>
+            default search radius. Crisis lines and national resources always shown.
+          </div>
+        </div>
+      </section>
 
+      {/* Search */}
+      <div className="search-block">
         <form className="search" onSubmit={submit}>
-          <label className="search-label" htmlFor="postcode">Enter your postcode</label>
+          <label className="search-label" htmlFor="postcode">Start here · Your postcode</label>
           <div className="search-row">
             <input
               id="postcode"
               type="text"
-              placeholder="e.g. EH8 8DX"
+              placeholder="EH8 8DX"
               value={postcode}
-              onChange={(e) => setPostcode(e.target.value.toUpperCase())}
+              onChange={(e) => { setPostcode(e.target.value.toUpperCase()); setError(""); }}
               autoComplete="postal-code"
               inputMode="text"
               spellCheck="false"
               aria-label="Postcode"
+              aria-invalid={!!error}
             />
             <button className="btn btn-safe big" type="submit">
               <Icon name="search" size={18} /> Find help near me
             </button>
           </div>
+          {error && (
+            <p style={{ marginTop: 12, color: "var(--emergency)", fontSize: 14 }}>{error}</p>
+          )}
           <div className="search-hint">
-            <span>Or try:</span>
-            <button type="button" onClick={() => { setPostcode("EH8 8DX"); }}>EH8 8DX</button>
-            <button type="button" onClick={() => { setPostcode("G2 4JR"); }}>G2 4JR</button>
-            <button type="button" onClick={() => { setPostcode("AB10"); }}>AB10</button>
-            <button type="button" onClick={() => go("results")}>Use my location</button>
+            <span className="lbl">Try</span>
+            <button type="button" onClick={() => { setPostcode("EH8 8DX"); setError(""); }}>EH8 8DX</button>
+            <button type="button" onClick={() => { setPostcode("G2 4JR"); setError(""); }}>G2 4JR</button>
+            <button type="button" onClick={() => { setPostcode("AB10"); setError(""); }}>AB10</button>
+            <button type="button" onClick={() => { setPostcode("IV2"); setError(""); }}>IV2</button>
+            <button type="button" onClick={() => { setPostcode("DD1"); setError(""); }}>DD1</button>
           </div>
         </form>
-      </section>
+      </div>
 
-      <section className="section">
+      {/* Crisis lines as a minimal list, not card-soup */}
+      <section className="section" style={{ marginTop: "clamp(48px, 6vw, 72px)" }}>
         <div className="section-title">
           <h2>If you need help right now</h2>
-          <span className="hint">All lines are free to call</span>
+          <span className="hint">All lines free to call · 24/7 where shown</span>
         </div>
-        <div className="emergency-block">
+        <ul className="crisis-list">
           {emergency.slice(0, 6).map(e => (
-            <a className={`emergency-card ${e.id === "e999" ? "is-emergency" : "is-crisis"}`} key={e.id} href={`tel:${e.phone.replace(/\s/g, "")}`}>
-              <span className="tag">
-                {e.id === "e999" ? "Immediate danger" : e.tag === "text" ? "Text" : "Crisis support"}
-                {e.age && <> · {e.age}</>}
-              </span>
-              <span className="name">{e.name}</span>
-              <span className="num">{e.phone}</span>
-              <span className="hrs">{e.hours}</span>
-              <span className="desc">{e.desc}</span>
-            </a>
+            <li key={e.id} className={e.id === "e999" ? "crisis-emer" : ""}>
+              <a href={`tel:${(e.phone || "").replace(/\D/g, "") || "999"}`}>
+                <span className="crisis-tag">
+                  {e.id === "e999" ? "Danger" : e.tag === "text" ? "Text" : "Crisis"}
+                </span>
+                <span className="crisis-meta">
+                  <span className="crisis-name">{e.name}</span>
+                  <span className="crisis-num">{e.phone}</span>
+                  <span className="crisis-hrs">{e.hours} · {e.desc}</span>
+                </span>
+                <span className="crisis-arrow"><Icon name="arrow-ne" size={16} /></span>
+              </a>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
+      {/* Category grid with custom iconography */}
       <section className="section">
         <div className="section-title">
-          <h2>What kind of help do you need?</h2>
-          <a className="muted" href="#" onClick={(e) => { e.preventDefault(); go("decision"); }} style={{ fontSize: 14 }}>Not sure? Use guidance →</a>
+          <h2>Browse by what you need</h2>
+          <a className="hint" href="#" onClick={(e) => { e.preventDefault(); go("decision"); }} style={{ color: "var(--accent-2)" }}>Not sure? Open guidance →</a>
         </div>
         <div className="cat-grid">
           {categories.map(c => (
             <a className="cat-card" key={c.id} href="#" onClick={(e) => { e.preventDefault(); go("results", { category: c.id }); }}>
-              <div className="glyph"><Icon name={c.icon} size={20} /></div>
+              <div className="cat-icon"><Icon name={CATEGORY_ICON[c.id] || "info"} size={44} /></div>
               <div className="meta">
                 <h3>{c.name}</h3>
                 <p>{c.desc}</p>
               </div>
+              <span className="cat-arrow"><Icon name="arrow-ne" size={18} /></span>
             </a>
           ))}
         </div>
       </section>
 
+      {/* Health boards */}
       <section className="section">
         <div className="section-title">
-          <h2>Browse by NHS board</h2>
-          <span className="hint">{window.APP_DATA.healthBoards.filter(b => b.id !== "national").length} territorial boards</span>
+          <h2>Help by NHS board</h2>
+          <span className="hint">{boards.length} territorial boards</span>
         </div>
-        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
-          {window.APP_DATA.healthBoards.filter(b => b.id !== "national").map(b => (
+        <div className="board-grid">
+          {boards.map(b => (
             <a
               key={b.id}
+              className="board-link"
               href="#"
               onClick={(e) => { e.preventDefault(); go("results", { healthBoard: b.id }); }}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "12px 16px", borderRadius: 10,
-                background: "var(--surface)", border: "1px solid var(--line)",
-                color: "var(--ink)", textDecoration: "none", fontSize: 14,
-              }}
             >
               <span>{b.name}</span>
               <Icon name="right" size={14} />
@@ -112,42 +149,49 @@ const LandingPage = ({ go, variant }) => {
         </div>
       </section>
 
+      {/* ADPs */}
       <section className="section">
         <div className="section-title">
           <h2>Drugs &amp; alcohol — finding your ADP</h2>
           <span className="hint">{window.APP_DATA.adps.length} partnerships</span>
         </div>
-        <div className="fact-card" style={{ maxWidth: 920 }}>
-          <p>Each council area has an <strong>Alcohol &amp; Drug Partnership (ADP)</strong> that commissions local treatment, harm reduction and the route into residential rehab. Funding for placements is currently covered by the Scottish Government&rsquo;s Rapid Capacity Fund.</p>
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Show all 30 ADPs</summary>
-            <ul style={{ columns: 2, columnGap: 24, marginTop: 12, paddingLeft: 18, fontSize: 14 }}>
-              {window.APP_DATA.adps.map(a => (
-                <li key={a.name} style={{ breakInside: "avoid", marginBottom: 4 }}>
-                  <strong>{a.name}</strong>{" "}
-                  <span className="muted" style={{ fontSize: 12 }}>· {a.healthBoard}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-            <button className="btn btn-secondary" onClick={() => go("results", { category: "addiction" })}>See addiction services</button>
-            <a className="btn btn-ghost" href="https://scottishdrugservices.com" target="_blank" rel="noopener noreferrer">Scottish Drug Services Directory</a>
+        <div className="callout" style={{ gridTemplateColumns: "1fr" }}>
+          <div>
+            <p style={{ margin: 0 }}>Each council area has an <strong>Alcohol &amp; Drug Partnership (ADP)</strong> that commissions local treatment, harm reduction and the route into residential rehab. Funding for placements is currently covered by the Scottish Government&rsquo;s Rapid Capacity Fund.</p>
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Show all {window.APP_DATA.adps.length} ADPs</summary>
+              <ul style={{ columns: 2, columnGap: 24, marginTop: 12, paddingLeft: 18, fontSize: 14 }}>
+                {window.APP_DATA.adps.map(a => (
+                  <li key={a.name} style={{ breakInside: "avoid", marginBottom: 4 }}>
+                    <strong>{a.name}</strong>{" "}
+                    <span className="muted" style={{ fontSize: 12 }}>· {a.healthBoard}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 16 }}>
+              <button className="btn btn-secondary" onClick={() => go("results", { category: "addiction" })}>See addiction services</button>
+              <a className="btn btn-ghost" href="https://scottishdrugservices.com" target="_blank" rel="noopener noreferrer">Scottish Drug Services Directory</a>
+            </div>
           </div>
         </div>
       </section>
 
+      {/* Plain English callout */}
       <section className="section">
-        <div className="section-title">
-          <h2>Plain English. No jargon.</h2>
-        </div>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 14, padding: 24, display: "grid", gap: 16, gridTemplateColumns: "1fr", maxWidth: 760 }}>
-          <p style={{ margin: 0, fontSize: "calc(17px * var(--fs-step))" }}>
-            Every page is written so it&rsquo;s clear even if you&rsquo;re tired, distressed, or scared. We explain what services do, who can use them, and what happens when you call.
-          </p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn btn-secondary" onClick={() => go("glossary")}>Open glossary</button>
-            <button className="btn btn-ghost" onClick={() => go("a11y")}>Accessibility help</button>
+        <div className="callout">
+          <div>
+            <p className="eyebrow">Built for the worst day</p>
+            <h2>Plain words. Big tap targets. No popups before help.</h2>
+          </div>
+          <div>
+            <p style={{ fontSize: "calc(15px * var(--fs-step))", color: "var(--ink-soft)" }}>
+              Every page is written so it&rsquo;s clear when you&rsquo;re tired, anxious, or under the influence. We explain what services do, who can use them, and what to expect when you call.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-secondary" onClick={() => go("glossary")}>Open glossary <Icon name="right" size={14} /></button>
+              <button className="btn btn-ghost" onClick={() => go("a11y")}>Accessibility help</button>
+            </div>
           </div>
         </div>
       </section>
@@ -159,7 +203,7 @@ const LandingPage = ({ go, variant }) => {
 
 const ResultsPage = ({ go, params }) => {
   const allServices = window.APP_DATA.services;
-  const postcode = params.postcode || "EH8 8DX";
+  const postcode = params.postcode || "";
   const initialCategory = params.category || "all";
 
   const [openNowOnly, setOpenNowOnly] = useState(false);
@@ -168,33 +212,74 @@ const ResultsPage = ({ go, params }) => {
   });
   const [category, setCategory] = useState(initialCategory);
   const [healthBoard, setHealthBoard] = useState(params.healthBoard || "all");
-  const [view, setView] = useState("list"); // list | split | map
+  const [radius, setRadius] = useState(DEFAULT_RADIUS_MILES);
+  const [view, setView] = useState("list");
   const [activePin, setActivePin] = useState(null);
 
   useEffect(() => { setCategory(initialCategory); }, [initialCategory]);
   useEffect(() => { setHealthBoard(params.healthBoard || "all"); }, [params.healthBoard]);
 
+  const origin = useMemo(() => lookupPostcode(postcode), [postcode]);
+
+  // Annotate each service with distance from the user's postcode (when known).
+  const annotated = useMemo(() => {
+    return allServices.map(s => {
+      const hasCoords = s.lat != null && s.lng != null;
+      const distance = origin && hasCoords ? milesBetween(origin, { lat: s.lat, lng: s.lng }) : null;
+      return { ...s, _distance: distance };
+    });
+  }, [allServices, origin]);
+
+  // Filter — distance gate first, then the user's filter selections.
   const filtered = useMemo(() => {
-    return allServices.filter(s => {
+    return annotated.filter(s => {
       if (category !== "all" && s.category !== category) return false;
       if (healthBoard !== "all" && s.healthBoard !== healthBoard && s.healthBoard !== "national") return false;
+
+      // Distance gate. National/Scotland-wide services + crisis lines are
+      // always shown. Anything geolocated must fall inside the radius.
+      if (origin && s._distance != null) {
+        if (s.category !== "crisis" && s.healthBoard !== "national" && s._distance > radius) return false;
+      }
+
       if (openNowOnly && !s.openNow) return false;
-      if (filters.wheelchair && !s.access.includes("wheelchair")) return false;
-      if (filters.online && !s.access.includes("online-option")) return false;
+      if (filters.wheelchair && !(s.access || []).includes("wheelchair")) return false;
+      if (filters.online && !(s.access || []).includes("online-option")) return false;
       if (filters.selfRef && !(s.referral || "").toLowerCase().includes("self")) return false;
       if (filters.lgbtq && s.category !== "lgbtq") return false;
-      if (filters.under18 && !(s.ageRange.includes("5") || s.ageRange.includes("16") || s.ageRange.includes("under"))) return false;
+      if (filters.under18 && !((s.ageRange || "").includes("5") || (s.ageRange || "").includes("16") || (s.ageRange || "").includes("under"))) return false;
       return true;
     });
-  }, [allServices, category, healthBoard, openNowOnly, filters]);
+  }, [annotated, category, healthBoard, radius, origin, openNowOnly, filters]);
+
+  // Sort: crisis first, then by distance asc (services without distance go last).
+  const sorted = useMemo(() => {
+    const order = (s) => (s.category === "crisis" ? -1 : 0);
+    return [...filtered].sort((a, b) => {
+      const ord = order(a) - order(b);
+      if (ord !== 0) return ord;
+      const ad = a._distance == null ? Infinity : a._distance;
+      const bd = b._distance == null ? Infinity : b._distance;
+      return ad - bd;
+    });
+  }, [filtered]);
 
   const boardLabel = healthBoard === "all"
     ? null
     : (window.APP_DATA.healthBoards.find(b => b.id === healthBoard)?.name || null);
 
-  // group by urgency
-  const crisis = filtered.filter(s => s.category === "crisis");
-  const others = filtered.filter(s => s.category !== "crisis");
+  const crisis = sorted.filter(s => s.category === "crisis");
+  const others = sorted.filter(s => s.category !== "crisis");
+
+  const locationLabel = origin
+    ? `${origin.name || "Scotland"}${origin.code ? ` · ${origin.code}` : ""}`
+    : (postcode || "Scotland-wide");
+
+  const clearAll = () => {
+    setOpenNowOnly(false);
+    setFilters({ wheelchair: false, online: false, selfRef: false, lgbtq: false, under18: false });
+    setCategory("all"); setHealthBoard("all"); setRadius(DEFAULT_RADIUS_MILES);
+  };
 
   return (
     <div className="page">
@@ -204,12 +289,17 @@ const ResultsPage = ({ go, params }) => {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end", justifyContent: "space-between", marginBottom: 24 }}>
         <div>
-          <p className="eyebrow">{filtered.length} services · sorted by urgency, then distance</p>
-          <h1 style={{ fontSize: "calc(32px * var(--fs-step))" }}>
-            Help near <span style={{ fontFamily: "var(--font-mono)" }}>{postcode}</span>
+          <p className="eyebrow">
+            {sorted.length} services
+            {origin ? ` · within ${radius} miles` : " · sorted by urgency"}
+          </p>
+          <h1 style={{ fontSize: "calc(32px * var(--fs-step))", lineHeight: 1.05 }}>
+            {postcode
+              ? <>Help near <span style={{ fontFamily: "var(--font-mono)" }}>{postcode}</span></>
+              : (boardLabel ? <>Help in {boardLabel}</> : "All services")}
           </h1>
-          <p className="muted" style={{ marginTop: 4 }}>
-            {boardLabel ? <>{boardLabel} · </> : <>Postcode {postcode} · </>}
+          <p className="muted" style={{ marginTop: 8 }}>
+            {locationLabel} ·{" "}
             <a href="#" onClick={(e) => { e.preventDefault(); go("home"); }} style={{ color: "var(--ink)" }}>Change postcode</a>
             {boardLabel && (
               <> · <a href="#" onClick={(e) => { e.preventDefault(); setHealthBoard("all"); }} style={{ color: "var(--ink)" }}>All boards</a></>
@@ -224,19 +314,13 @@ const ResultsPage = ({ go, params }) => {
       </div>
 
       {/* category tab strip */}
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 6, marginBottom: 20, scrollbarWidth: "none" }}>
+      <div className="cat-pills">
         {[{ id: "all", name: "All services" }, ...window.APP_DATA.categories].map(c => (
           <button
             key={c.id}
-            className="btn"
+            className="pill"
+            aria-pressed={category === c.id}
             onClick={() => setCategory(c.id)}
-            style={{
-              minHeight: 40, padding: "0 14px", fontSize: 14, borderRadius: 999,
-              background: category === c.id ? "var(--ink)" : "var(--surface)",
-              color: category === c.id ? "var(--bg)" : "var(--ink)",
-              border: `1px solid ${category === c.id ? "var(--ink)" : "var(--line-strong)"}`,
-              flex: "0 0 auto",
-            }}
           >
             {c.name}
           </button>
@@ -245,6 +329,27 @@ const ResultsPage = ({ go, params }) => {
 
       <div className={`results-layout ${view === "split" ? "with-map" : ""}`}>
         <aside className="filter-panel" aria-label="Filters">
+          {origin && (
+            <>
+              <h3>Distance</h3>
+              <div className="filter-group">
+                <div className="radius-row">
+                  <input
+                    type="range"
+                    min={1} max={50} step={1}
+                    value={radius}
+                    onChange={(e) => setRadius(Number(e.target.value))}
+                    aria-label="Search radius in miles"
+                  />
+                  <span className="val">{radius} mi</span>
+                </div>
+                <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+                  Crisis lines &amp; national services are always shown.
+                </p>
+              </div>
+            </>
+          )}
+
           <h3>Quick filters</h3>
           <div className="filter-group">
             <label><input type="checkbox" checked={openNowOnly} onChange={(e) => setOpenNowOnly(e.target.checked)} /> Open right now</label>
@@ -254,28 +359,24 @@ const ResultsPage = ({ go, params }) => {
             <label><input type="checkbox" checked={filters.under18} onChange={(e) => setFilters({ ...filters, under18: e.target.checked })} /> Under 18 friendly</label>
             <label><input type="checkbox" checked={filters.lgbtq} onChange={(e) => setFilters({ ...filters, lgbtq: e.target.checked })} /> LGBTQ+ affirming</label>
           </div>
+
           <h3>Service type</h3>
           <div className="filter-group">
             {window.APP_DATA.categories.map(c => (
               <label key={c.id}>
-                <input type="radio" name="cat" checked={category === c.id} onChange={() => setCategory(c.id)} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} />
+                <input type="radio" name="cat" checked={category === c.id} onChange={() => setCategory(c.id)} />
                 {c.name}
               </label>
             ))}
-            <label><input type="radio" name="cat" checked={category === "all"} onChange={() => setCategory("all")} style={{ width: 18, height: 18, accentColor: "var(--accent)" }} /> Show all</label>
+            <label><input type="radio" name="cat" checked={category === "all"} onChange={() => setCategory("all")} /> Show all</label>
           </div>
+
           <h3>NHS board</h3>
           <div className="filter-group">
             <select
               value={healthBoard}
               onChange={(e) => setHealthBoard(e.target.value)}
               aria-label="Filter by NHS board"
-              style={{
-                width: "100%", height: 44, padding: "0 12px",
-                borderRadius: 10, border: "1.5px solid var(--line-strong)",
-                background: "var(--bg)", color: "var(--ink)",
-                font: "inherit", fontSize: 14,
-              }}
             >
               <option value="all">All boards</option>
               {window.APP_DATA.healthBoards.map(b => (
@@ -283,38 +384,49 @@ const ResultsPage = ({ go, params }) => {
               ))}
             </select>
           </div>
-          <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => { setOpenNowOnly(false); setFilters({ wheelchair: false, online: false, selfRef: false, lgbtq: false, under18: false }); setCategory("all"); setHealthBoard("all"); }}>Clear all</button>
+
+          <button className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} onClick={clearAll}>Clear all</button>
         </aside>
 
         {view !== "map" && (
           <div className="service-list">
             {crisis.length > 0 && (
               <>
-                <div className="section-title" style={{ marginBottom: 4 }}>
+                <div className="section-title" style={{ marginBottom: 4, paddingBottom: 8 }}>
                   <h2 style={{ fontSize: "calc(19px * var(--fs-step))", color: "var(--emergency)" }}>Crisis support · open now</h2>
+                  <span className="hint">{crisis.length} {crisis.length === 1 ? "service" : "services"}</span>
                 </div>
-                {crisis.map(s => <ServiceCard key={s.id} service={s} onOpen={(id) => go("detail", { id })} />)}
+                {crisis.map(s => <ServiceCard key={s.id} service={s} distance={s._distance} onOpen={(id) => go("detail", { id })} />)}
               </>
             )}
             {others.length > 0 && (
               <>
-                <div className="section-title" style={{ marginTop: 16, marginBottom: 4 }}>
-                  <h2 style={{ fontSize: "calc(19px * var(--fs-step))" }}>Other services</h2>
+                <div className="section-title" style={{ marginTop: 24, marginBottom: 4, paddingBottom: 8 }}>
+                  <h2 style={{ fontSize: "calc(19px * var(--fs-step))" }}>
+                    {origin ? "Nearby services" : "Other services"}
+                  </h2>
+                  <span className="hint">{others.length} {others.length === 1 ? "service" : "services"}</span>
                 </div>
-                {others.map(s => <ServiceCard key={s.id} service={s} onOpen={(id) => go("detail", { id })} />)}
+                {others.map(s => <ServiceCard key={s.id} service={s} distance={s._distance} onOpen={(id) => go("detail", { id })} />)}
               </>
             )}
-            {filtered.length === 0 && (
-              <div className="fact-card">
+            {sorted.length === 0 && (
+              <div className="empty-card">
                 <h3>No services match these filters.</h3>
-                <p>Try clearing some filters, or call NHS 24 on 111 — they can point you to what&rsquo;s available.</p>
+                {origin
+                  ? <p>Nothing local within {radius} miles fits. Try widening the radius, clearing filters, or call NHS 24 on 111 — they can point you to what&rsquo;s available right now.</p>
+                  : <p>Try clearing some filters, or call NHS 24 on 111 — they can point you to what&rsquo;s available.</p>}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" onClick={() => setRadius(Math.min(50, radius + 10))}>Widen to {Math.min(50, radius + 10)} mi</button>
+                  <button className="btn btn-ghost" onClick={clearAll}>Clear all filters</button>
+                </div>
               </div>
             )}
           </div>
         )}
 
         {(view === "split" || view === "map") && (
-          <MapPanel services={filtered} activeId={activePin} onPin={setActivePin} />
+          <MapPanel services={sorted} activeId={activePin} onPin={setActivePin} />
         )}
       </div>
     </div>
@@ -340,6 +452,7 @@ const DetailPage = ({ go, params }) => {
     "phone-counselling": "Phone counselling",
     "dual-diagnosis": "Dual diagnosis support",
     "long-stay": "Long stay available",
+    "home-visit": "Home visits",
   };
   const noLabels = { "childcare": "On-site childcare" };
 
@@ -352,8 +465,8 @@ const DetailPage = ({ go, params }) => {
       <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", alignItems: "flex-end", gap: 16, marginBottom: 16 }}>
         <div>
           <p className="eyebrow">{window.APP_DATA.categories.find(c => c.id === service.category)?.name}</p>
-          <h1>{service.name}</h1>
-          <p className="muted" style={{ marginTop: 4 }}>{service.coverage} · last verified {service.verified}</p>
+          <h1 style={{ fontSize: "clamp(32px, 5vw, 56px)" }}>{service.name}</h1>
+          <p className="muted" style={{ marginTop: 8 }}>{service.coverage} · last verified {service.verified}</p>
         </div>
         <span className={`open-pill ${service.openNow ? "open" : "closed"}`} style={{ fontSize: 13 }}>
           {service.openNow ? "Open now" : "Closed"}
@@ -366,7 +479,7 @@ const DetailPage = ({ go, params }) => {
           <div className="num">{service.phone}</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <a className="btn btn-safe" href={`tel:${service.phone.replace(/\s/g, "")}`}>
+          <a className="btn btn-safe" href={`tel:${(service.phone || "").replace(/\s/g, "")}`}>
             <Icon name="phone" size={16} /> Tap to call
           </a>
           <button className="btn btn-ghost" style={{ borderColor: "rgba(255,255,255,0.3)", color: "var(--bg)" }} onClick={() => navigator.clipboard?.writeText(service.phone)}>
@@ -399,7 +512,7 @@ const DetailPage = ({ go, params }) => {
           <div className="fact-card">
             <h2 style={{ fontSize: "calc(22px * var(--fs-step))", marginBottom: 14 }}>Accessibility</h2>
             <ul className="checks">
-              {service.access.map(a => (
+              {(service.access || []).map(a => (
                 <li key={a}><span className="yes"><Icon name="check" size={18} /></span><span>{accessLabels[a] || a}</span></li>
               ))}
               {(service.noAccess || []).map(a => (
@@ -450,12 +563,12 @@ const DetailPage = ({ go, params }) => {
         </div>
 
         <aside>
-          <div className="fact-card">
+          <div className="aside-card">
             <div className="fact-row">
               <span className="label">Hours</span>
               <div className="val">
-                <strong>{service.hours.today}</strong>
-                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{service.hours.week}</div>
+                <strong>{service.hours?.today}</strong>
+                <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{service.hours?.week}</div>
               </div>
             </div>
             <div className="fact-row">
@@ -487,9 +600,8 @@ const DetailPage = ({ go, params }) => {
             )}
           </div>
 
-          {/* mini map */}
           {service.lat && (
-            <div className="fact-card" style={{ padding: 0, overflow: "hidden", marginTop: 16 }}>
+            <div className="aside-card" style={{ padding: 0, overflow: "hidden", marginTop: 12 }}>
               <div style={{ height: 220, position: "relative", background: "linear-gradient(135deg, #e9ecdd, #e1e4d2)" }}>
                 <div className="map-roads" aria-hidden="true"></div>
                 <div className="map-pin active" style={{ left: "50%", top: "50%" }}>
@@ -497,10 +609,10 @@ const DetailPage = ({ go, params }) => {
                 </div>
               </div>
               <div style={{ padding: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <a className="btn btn-secondary" href="#" style={{ flex: 1, minWidth: 130 }}>
+                <a className="btn btn-secondary" href={`https://www.openstreetmap.org/?mlat=${service.lat}&mlon=${service.lng}&zoom=16`} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 130 }}>
                   <Icon name="pin" size={14} /> Get directions
                 </a>
-                <button className="btn btn-ghost" onClick={() => navigator.clipboard?.writeText(service.address)} style={{ flex: 1, minWidth: 130 }}>
+                <button className="btn btn-ghost" onClick={() => navigator.clipboard?.writeText(service.address || "")} style={{ flex: 1, minWidth: 130 }}>
                   <Icon name="copy" size={14} /> Copy address
                 </button>
               </div>

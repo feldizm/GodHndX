@@ -117,7 +117,7 @@ const DecisionPage = ({ go }) => (
       ))}
     </div>
 
-    <div className="fact-card" style={{ marginTop: 32, maxWidth: 720 }}>
+    <div className="aside-card" style={{ marginTop: 32, maxWidth: 720 }}>
       <h2 style={{ fontSize: "calc(22px * var(--fs-step))", marginBottom: 10 }}>I don&rsquo;t know where to start</h2>
       <p>That&rsquo;s OK. The simplest thing is to enter your postcode and we&rsquo;ll show what&rsquo;s near you. Call the first one — they&rsquo;ll point you to what you need.</p>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
@@ -126,7 +126,7 @@ const DecisionPage = ({ go }) => (
       </div>
     </div>
 
-    <div className="fact-card" style={{ marginTop: 16, maxWidth: 720, background: "var(--surface-soft)" }}>
+    <div className="aside-card" style={{ marginTop: 16, maxWidth: 720, background: "var(--surface-soft)" }}>
       <h2 style={{ fontSize: "calc(20px * var(--fs-step))", marginBottom: 10 }}>About these services</h2>
       <ul className="checks">
         <li><span className="yes"><Icon name="check" size={18} /></span><span>All free on the NHS.</span></li>
@@ -241,7 +241,7 @@ const A11yPage = ({ go }) => (
 
     <section style={{ marginTop: 32 }}>
       <h2 style={{ fontSize: "calc(24px * var(--fs-step))", marginBottom: 12 }}>Still having trouble?</h2>
-      <div className="fact-card" style={{ maxWidth: 620 }}>
+      <div className="aside-card" style={{ maxWidth: 620 }}>
         <p>Email <a href="mailto:accessibility@example.scot">accessibility@example.scot</a> or call 0131 496 0000. We respond within 48 hours.</p>
         <p className="muted" style={{ fontSize: 14, marginBottom: 0 }}>You can also contact the NHS Scotland Equality & Human Rights Team.</p>
       </div>
@@ -294,7 +294,7 @@ const GlossaryPage = ({ go }) => {
       ))}
 
       {items.length === 0 && (
-        <div className="fact-card"><p>No matches for &ldquo;{q}&rdquo;. Try a different word, or <a href="#" onClick={(e) => { e.preventDefault(); setQ(""); }}>see all terms</a>.</p></div>
+        <div className="aside-card"><p>No matches for &ldquo;{q}&rdquo;. Try a different word, or <a href="#" onClick={(e) => { e.preventDefault(); setQ(""); }}>see all terms</a>.</p></div>
       )}
     </div>
   );

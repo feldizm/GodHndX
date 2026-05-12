@@ -1,4 +1,4 @@
-// Shared components for the prototype
+// Shared components — custom iconography, header/footer, service card
 const { useState, useEffect, useMemo, useRef } = React;
 
 // Normalize a service website value into a navigable URL.
@@ -12,11 +12,165 @@ const externalUrl = (value) => {
   return `https://${trimmed.replace(/^\/+/, "")}`;
 };
 
-// Inline icon component — small set, no external lib
+// ---------------------------------------------------------------------------
+// Postcode -> approximate coordinates
+//
+// A tiny lookup keyed by Scottish postcode area (the alphabetic prefix). It's
+// not a substitute for postcodes.io, but it's offline-safe and good enough
+// to filter the directory by "is this within N miles". The coords sit roughly
+// in the centre of each area.
+const POSTCODE_AREAS = {
+  AB: { lat: 57.149, lng: -2.094, name: "Aberdeen" },
+  DD: { lat: 56.462, lng: -2.970, name: "Dundee" },
+  DG: { lat: 55.071, lng: -3.604, name: "Dumfries" },
+  EH: { lat: 55.953, lng: -3.188, name: "Edinburgh" },
+  FK: { lat: 56.001, lng: -3.785, name: "Falkirk / Stirling" },
+  G:  { lat: 55.864, lng: -4.252, name: "Glasgow" },
+  HS: { lat: 58.213, lng: -6.387, name: "Western Isles" },
+  IV: { lat: 57.477, lng: -4.224, name: "Inverness" },
+  KA: { lat: 55.612, lng: -4.501, name: "Kilmarnock / Ayr" },
+  KW: { lat: 58.643, lng: -3.090, name: "Kirkwall / Caithness" },
+  KY: { lat: 56.114, lng: -3.156, name: "Kirkcaldy / Fife" },
+  ML: { lat: 55.659, lng: -3.785, name: "Motherwell / Lanarkshire" },
+  PA: { lat: 55.847, lng: -4.423, name: "Paisley" },
+  PH: { lat: 56.395, lng: -3.437, name: "Perth" },
+  TD: { lat: 55.605, lng: -2.722, name: "Borders" },
+  ZE: { lat: 60.155, lng: -1.146, name: "Shetland" },
+};
+
+// Slightly more accurate centres for a handful of common districts (first
+// 1–3 chars). Falls back to the area-level lookup above.
+const POSTCODE_DISTRICTS = {
+  EH1:  { lat: 55.951, lng: -3.190 },
+  EH2:  { lat: 55.953, lng: -3.197 },
+  EH3:  { lat: 55.957, lng: -3.205 },
+  EH8:  { lat: 55.946, lng: -3.175 },
+  EH10: { lat: 55.927, lng: -3.213 },
+  EH16: { lat: 55.920, lng: -3.139 },
+  G1:   { lat: 55.860, lng: -4.250 },
+  G2:   { lat: 55.864, lng: -4.260 },
+  G3:   { lat: 55.866, lng: -4.281 },
+  G12:  { lat: 55.876, lng: -4.299 },
+  AB10: { lat: 57.144, lng: -2.110 },
+  AB25: { lat: 57.155, lng: -2.117 },
+  DD1:  { lat: 56.462, lng: -2.970 },
+  IV2:  { lat: 57.471, lng: -4.196 },
+  PH1:  { lat: 56.395, lng: -3.437 },
+  KY1:  { lat: 56.114, lng: -3.156 },
+};
+
+const lookupPostcode = (raw) => {
+  if (!raw) return null;
+  const code = String(raw).toUpperCase().replace(/\s+/g, "");
+  // Try district (first 2-4 chars) by stepping down to the area letters.
+  for (let n = Math.min(code.length, 4); n >= 2; n--) {
+    const slice = code.slice(0, n);
+    if (POSTCODE_DISTRICTS[slice]) return { ...POSTCODE_DISTRICTS[slice], code: slice };
+  }
+  // Area = the leading letters only (1 or 2).
+  const area = (code.match(/^[A-Z]{1,2}/) || [])[0];
+  if (area && POSTCODE_AREAS[area]) return { ...POSTCODE_AREAS[area], code: area };
+  return null;
+};
+
+// Great-circle distance in miles using the Haversine formula.
+const milesBetween = (a, b) => {
+  if (!a || !b) return null;
+  const R = 3958.8;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+};
+
+// Custom-drawn icons. Category icons are bespoke shapes (life-ring, profile,
+// sprig, venn, paper-plane, feather, rings, flame). Utility icons keep a
+// consistent 1.5 stroke, 24px viewBox.
 const Icon = ({ name, size = 18 }) => {
   const s = size;
-  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round" };
+  const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+
   switch (name) {
+    /* ---------- Category icons ---------- */
+    case "cat-crisis":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <circle cx="16" cy="16" r="12" />
+          <circle cx="16" cy="16" r="5" />
+          <line x1="16" y1="4" x2="16" y2="11" />
+          <line x1="16" y1="21" x2="16" y2="28" />
+          <line x1="4" y1="16" x2="11" y2="16" />
+          <line x1="21" y1="16" x2="28" y2="16" />
+        </svg>
+      );
+    case "cat-mind":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M22 28v-3a4 4 0 0 0-1.2-2.9c1.5-1.6 2.7-3.6 3-5.9.4-3.4-.9-7-3.5-9.3-2-1.9-4.8-3-7.5-2.9-3 .2-5.7 1.8-7.2 4.2-1.4 2.3-1.7 5.2-.7 7.8.6 1.5 1.5 2.9 2.7 4l.4.4V28" />
+          <path d="M11 18a4 4 0 0 1 4-4h0a4 4 0 0 1 3 6.7" />
+        </svg>
+      );
+    case "cat-addiction":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M16 28v-9" />
+          <path d="M16 19c0-4 3-7 8-7-.5 4-3.5 7-8 7Z" />
+          <path d="M16 22c0-3-2-5-6-5 .5 3 2.5 5 6 5Z" />
+          <path d="M10 28h12" />
+        </svg>
+      );
+    case "cat-peer":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <circle cx="12" cy="16" r="8" />
+          <circle cx="20" cy="16" r="8" />
+        </svg>
+      );
+    case "cat-young":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M28 4 4 14l9 4 4 9 11-23Z" />
+          <path d="M13 18 28 4" />
+        </svg>
+      );
+    case "cat-bereavement":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M22 4c-7 0-12 5-12 13v9l16-16c2-2 2-6-1-6Z" />
+          <path d="M10 26h8" />
+          <path d="M14 14h6" />
+          <path d="M12 19h6" />
+        </svg>
+      );
+    case "cat-lgbtq":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <circle cx="11" cy="16" r="7" />
+          <circle cx="21" cy="16" r="7" />
+          <path d="M15.5 11c1.5 1 2.5 3 2.5 5s-1 4-2.5 5" />
+        </svg>
+      );
+    case "cat-spiritual":
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M16 4c0 4 5 5 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 0-1-1-2-1-3 1 0 4 .5 4-1Z" />
+          <path d="M16 24v4" />
+          <path d="M12 28h8" />
+        </svg>
+      );
+    case "cat-advocacy":
+      // Shield with check — speaking up / standing alongside
+      return (
+        <svg width={s} height={s} viewBox="0 0 32 32" {...stroke}>
+          <path d="M16 4 6 7v9c0 6 4.5 10 10 12 5.5-2 10-6 10-12V7l-10-3Z" />
+          <path d="m12 16 3 3 5-6" />
+        </svg>
+      );
+
+    /* ---------- Utility icons ---------- */
     case "phone":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.96.34 1.9.66 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.32 1.85.54 2.81.66A2 2 0 0 1 22 16.92Z"/></svg>;
     case "pin":
@@ -28,11 +182,13 @@ const Icon = ({ name, size = 18 }) => {
     case "info":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>;
     case "alert":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>;
+      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>;
     case "back":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="m15 18-6-6 6-6"/></svg>;
+      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M19 12H5M12 19l-7-7 7-7"/></svg>;
     case "right":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="m9 18 6-6-6-6"/></svg>;
+      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M5 12h14M12 5l7 7-7 7"/></svg>;
+    case "arrow-ne":
+      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M7 17 17 7M8 7h9v9"/></svg>;
     case "copy":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
     case "check":
@@ -45,50 +201,44 @@ const Icon = ({ name, size = 18 }) => {
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>;
     case "map":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>;
-    case "mobile":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>;
-    case "tablet":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/></svg>;
-    case "desktop":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>;
     case "mail":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>;
     case "globe":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>;
-    case "heart":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></svg>;
-    case "mind":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 2a4 4 0 0 0-4 4v2a4 4 0 0 0-2 7.46V19a3 3 0 0 0 6 0v-1"/><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1 2 7.46V19a3 3 0 0 1-6 0"/></svg>;
-    case "leaf":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M11 20A7 7 0 0 1 4 13a7 7 0 0 1 7-7h9v9a7 7 0 0 1-7 7Z"/><path d="M4 13c4-1 9-3 12-6"/></svg>;
-    case "spark":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg>;
-    case "flag":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M4 22V4a2 2 0 0 1 2-2h12l-3 5 3 5H6"/></svg>;
-    case "people":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v1M15 20v-1a3 3 0 0 1 2-2.83"/></svg>;
     case "ear":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 4-6 9a3.5 3.5 0 1 1-7 0"/></svg>;
     case "keyboard":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>;
     case "eye":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>;
-    case "type":
-      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>;
     case "wifi-off":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="m2 2 20 20M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a11 11 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a16 16 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>;
     case "brain":
       return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M9.5 2a3.5 3.5 0 0 0-3.5 3.5v0a3.5 3.5 0 0 0-2 6.32A3.5 3.5 0 0 0 6 18.5a3.5 3.5 0 0 0 6 .5v-17a3.5 3.5 0 0 0-2.5-1ZM14.5 2a3.5 3.5 0 0 1 3.5 3.5v0a3.5 3.5 0 0 1 2 6.32A3.5 3.5 0 0 1 18 18.5a3.5 3.5 0 0 1-6 .5"/></svg>;
+    case "heart":
+      return <svg width={s} height={s} viewBox="0 0 24 24" {...stroke}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"/></svg>;
     default:
       return null;
   }
 };
 
-// Sticky crisis strip at top of header
+// Map category id -> icon name
+const CATEGORY_ICON = {
+  "crisis": "cat-crisis",
+  "mental-health": "cat-mind",
+  "addiction": "cat-addiction",
+  "peer": "cat-peer",
+  "young": "cat-young",
+  "bereavement": "cat-bereavement",
+  "lgbtq": "cat-lgbtq",
+  "spiritual": "cat-spiritual",
+  "advocacy": "cat-advocacy",
+};
+
 const CrisisStrip = () => (
   <div className="crisis-strip" role="region" aria-label="Crisis support">
-    <Icon name="alert" size={16} />
-    <span><strong>In crisis right now?</strong> Call <a href="tel:111">NHS 24 · 111</a> · Text SHOUT to <a href="sms:85258&body=SHOUT">85258</a> · <a href="tel:999">999</a> if life is in danger.</span>
+    <span className="pulse" aria-hidden="true"></span>
+    <span><strong>In crisis right now?</strong>&nbsp; Call <a href="tel:111">NHS 24 · 111</a> · Text SHOUT to <a href="sms:85258&body=SHOUT">85258</a> · <a href="tel:999">999</a> if life is in danger.</span>
   </div>
 );
 
@@ -117,20 +267,19 @@ const Footer = ({ go }) => (
   <footer className="site-foot">
     <div className="row">
       <div>
-        <h4>About this library</h4>
-        <p>A free, public directory of mental health and addiction services across Scotland. {window.APP_DATA?.services?.length || 0}+ services indexed across 14 NHS boards and 30 Alcohol & Drug Partnerships. Current as of May 2026.</p>
-        <p className="muted" style={{ fontSize: 13 }}>Sources: gov.scot (residential rehab capacity, Oct 2025), all 14 NHS boards, 30 ADPs, Scottish Drug Services Directory, ALISS, SAMH, Penumbra, Cruse, LGBT Health & Wellbeing, Pink Therapy, AA/NA/CA intergroups, NHS chaplaincy networks.</p>
+        <div className="mark">Scotland MH&amp;A Library</div>
+        <p>A free, public directory of mental health and addiction services across Scotland. Information current as of May 2026.</p>
+        <p className="muted" style={{ fontSize: 13 }}>Sources: gov.scot, NHS boards, 30 Alcohol &amp; Drug Partnerships, ALISS, SAMH, Penumbra, Cruse, LGBT Health &amp; Wellbeing.</p>
       </div>
       <div>
-        <h4>Help us improve</h4>
+        <h4>Improve this site</h4>
         <a href="#">Report missing service</a>
-        <a href="#">Report broken info</a>
+        <a href="#">Flag outdated info</a>
         <a href="#" onClick={(e) => { e.preventDefault(); go("a11y"); }}>Accessibility</a>
       </div>
       <div>
-        <h4>Get in touch</h4>
+        <h4>Contact</h4>
         <a href="mailto:hello@example.scot">hello@example.scot</a>
-        <a href="tel:01314960000">0131 496 0000</a>
         <a href="#" onClick={(e) => { e.preventDefault(); go("glossary"); }}>Plain English glossary</a>
       </div>
     </div>
@@ -140,29 +289,42 @@ const Footer = ({ go }) => (
 const MobileCrisisBar = () => (
   <nav className="mobile-crisis-bar" aria-label="Crisis quick-dial">
     <a className="btn btn-emergency" href="tel:999">999</a>
-    <a className="btn btn-urgent" href="tel:111">NHS · 111</a>
+    <a className="btn btn-urgent" href="tel:111">NHS 111</a>
     <a className="btn btn-safe" href="tel:116123">Samaritans</a>
   </nav>
 );
 
-// Service card used on results list
-const ServiceCard = ({ service, onOpen }) => (
+const formatMiles = (m) => {
+  if (m == null) return null;
+  if (m < 1) return `${(m * 10 | 0) / 10} mi`;
+  if (m < 10) return `${m.toFixed(1)} mi`;
+  return `${Math.round(m)} mi`;
+};
+
+const ServiceCard = ({ service, onOpen, distance }) => (
   <article className="service-card">
     <div className="service-card-head">
       <div>
         <h3>{service.name}</h3>
         <p className="muted" style={{ margin: "4px 0 0", fontSize: 14 }}>{service.coverage}</p>
       </div>
-      <span className={`open-pill ${service.openNow ? "open" : "closed"}`}>
-        {service.openNow ? "Open now" : "Closed"}
-      </span>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {distance != null && (
+          <span className="distance-pill" aria-label={`${formatMiles(distance)} from your postcode`}>
+            {formatMiles(distance)}
+          </span>
+        )}
+        <span className={`open-pill ${service.openNow ? "open" : "closed"}`}>
+          {service.openNow ? "Open now" : "Closed"}
+        </span>
+      </div>
     </div>
     <div className="service-meta">
       {service.address && (
         <div className="row"><Icon name="pin" size={16} /><span>{service.address}</span></div>
       )}
-      <div className="row"><Icon name="phone" size={16} /><span style={{ fontFamily: "var(--font-mono)", fontWeight: 700 }}>{service.phone}</span></div>
-      <div className="row"><Icon name="clock" size={16} /><span>{service.hours.today}</span></div>
+      <div className="row"><Icon name="phone" size={16} /><span style={{ fontFamily: "var(--font-mono)", fontWeight: 500 }}>{service.phone}</span></div>
+      <div className="row"><Icon name="clock" size={16} /><span>{service.hours?.today}</span></div>
       <div className="row"><Icon name="users" size={16} /><span>Ages {service.ageRange}{service.wait ? ` · Wait ${service.wait}` : ""}</span></div>
     </div>
     <p className="blurb">{service.blurb}</p>
@@ -180,26 +342,24 @@ const ServiceCard = ({ service, onOpen }) => (
   </article>
 );
 
-// Tiny SVG-based "map" — pins for any services with lat/lng. Auto-bounds
-// to whatever's passed in (with margin) so non-Edinburgh searches still
-// show pins. Falls back to a Scotland-wide extent if 0–1 services have coords.
-const SCOT_BOUNDS = { minLat: 54.6, maxLat: 60.9, minLng: -7.7, maxLng: -0.7 };
 const MapPanel = ({ services, activeId, onPin }) => {
-  const geo = services.filter(s => s.lat && s.lng);
+  // Auto-fit bounds to the services that have coords (with a small fallback
+  // to Edinburgh so the empty state still looks like a map).
+  const pinned = services.filter(s => s.lat && s.lng);
   let bounds;
-  if (geo.length >= 2) {
-    const lats = geo.map(s => s.lat), lngs = geo.map(s => s.lng);
-    const padLat = Math.max(0.02, (Math.max(...lats) - Math.min(...lats)) * 0.15);
-    const padLng = Math.max(0.03, (Math.max(...lngs) - Math.min(...lngs)) * 0.15);
-    bounds = {
-      minLat: Math.min(...lats) - padLat, maxLat: Math.max(...lats) + padLat,
-      minLng: Math.min(...lngs) - padLng, maxLng: Math.max(...lngs) + padLng,
-    };
-  } else if (geo.length === 1) {
-    const s = geo[0];
-    bounds = { minLat: s.lat - 0.05, maxLat: s.lat + 0.05, minLng: s.lng - 0.08, maxLng: s.lng + 0.08 };
+  if (pinned.length === 0) {
+    bounds = { minLat: 55.91, maxLat: 55.98, minLng: -3.26, maxLng: -3.13 };
   } else {
-    bounds = SCOT_BOUNDS;
+    const lats = pinned.map(s => s.lat);
+    const lngs = pinned.map(s => s.lng);
+    const padLat = Math.max(0.02, (Math.max(...lats) - Math.min(...lats)) * 0.15);
+    const padLng = Math.max(0.02, (Math.max(...lngs) - Math.min(...lngs)) * 0.15);
+    bounds = {
+      minLat: Math.min(...lats) - padLat,
+      maxLat: Math.max(...lats) + padLat,
+      minLng: Math.min(...lngs) - padLng,
+      maxLng: Math.max(...lngs) + padLng,
+    };
   }
   const pinFor = (s) => {
     if (!s.lat || !s.lng) return null;
@@ -207,7 +367,6 @@ const MapPanel = ({ services, activeId, onPin }) => {
     const y = ((bounds.maxLat - s.lat) / (bounds.maxLat - bounds.minLat)) * 100;
     return { x, y };
   };
-  const offScreen = services.length - geo.length;
   return (
     <aside className="map-panel" aria-label="Map of services">
       <div className="map-canvas">
@@ -230,14 +389,12 @@ const MapPanel = ({ services, activeId, onPin }) => {
           );
         })}
       </div>
-      <div className="map-attribution">
-        Approximate locations · tap a pin for details
-        {offScreen > 0 && ` · ${offScreen} phone/online service${offScreen > 1 ? "s" : ""} not shown`}
-      </div>
+      <div className="map-attribution">Approximate locations · tap a pin for details</div>
     </aside>
   );
 };
 
 Object.assign(window, {
-  Icon, Header, Footer, CrisisStrip, MobileCrisisBar, ServiceCard, MapPanel,
+  Icon, CATEGORY_ICON, Header, Footer, CrisisStrip, MobileCrisisBar,
+  ServiceCard, MapPanel, externalUrl, lookupPostcode, milesBetween, formatMiles,
 });
